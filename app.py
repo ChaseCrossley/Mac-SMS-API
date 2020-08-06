@@ -7,6 +7,7 @@ import time
 import threading
 import subprocess
 from ScriptingBridge import SBApplication
+from pathlib import Path
 
 app = Flask(__name__)
 
@@ -36,7 +37,7 @@ def add_phone_number():
         phone_number = data.get('phone number')
         phone_number_iteration.update({phone_number: 0})
         first_message_que.append(phone_number)
-        return jsonify(f"I have started communication with {data.get('phone number')}")
+        return jsonify(f"I have started communication with {phone_number}")
     if request.method == 'GET':
         return 'I AM WORKING'
 
@@ -48,7 +49,10 @@ def send_message(phone_number: str, message: str, SPAM=False, delimiter=None, us
                                   shell=True)
             return
 
-        buddy_to_message = [b for b in Messages.buddies() if b.fullName().replace('(', '').replace(')', '').replace(' ', '').replace('-', '') == phone_number][0]
+        buddy_to_message = [b for b in Messages.buddies() if
+                            b.fullName().replace('(', '').replace(')', '').replace(' ', '').replace('-',
+                                                                                                    '') == phone_number][
+            0]
         if SPAM:
             assert delimiter
             for sub_message in message.split(sep=delimiter):
@@ -58,7 +62,7 @@ def send_message(phone_number: str, message: str, SPAM=False, delimiter=None, us
 
 
 def connect_to_db():
-    return sqlite3.connect('/Users/dakotac5/Library/Messages/chat.db')
+    return sqlite3.connect(f'{Path.home()}/Library/Messages/chat.db')
 
 
 def get_initial_most_recent_date(db_connection: Connection):
@@ -91,7 +95,7 @@ def get_file_lines(start_lines, end_line):
 """ message should be a tuple of (message:string, date:int(long), phone_number:string)"""
 
 
-def valid_message(message_data):
+def valid_message(message_data: tuple):
     global most_recent_date
     global CONTINUATION_STRING
     global DISCONTINUATION_STRING
@@ -119,6 +123,7 @@ def send_first_messages():
             first_message_que.pop(0)
             time.sleep(4)
 
+
 def get_next_message(message_data: tuple):
     global phone_number_iteration
     global CONTINUATION_STRING
@@ -133,7 +138,7 @@ def get_next_message(message_data: tuple):
             return send_rest_of_messages(phone_number)
         else:
             continuation_message = f"This is message set {iteration}. You have {MAX_ITERATION_COUNT - iteration}" \
-                                   f" sets until the rest of the script is sent." if MAX_ITERATION_COUNT != iteration \
+                                   f" set(s) until the rest of the script is sent." if MAX_ITERATION_COUNT != iteration \
                 else "WARNING WARNING WARNING WARNING this is the LAST TIME to opt out before the rest of the " \
                      "script is sent. Once you start the process there is no going back. " \
                      "REMEMBER message rates DO apply."
@@ -144,15 +149,16 @@ def get_next_message(message_data: tuple):
         return "We have canceled your contact information. Don't forget to check out actual club meetings of the CBU " \
                "ACM."
 
+
 """ message should be a tuple of (message:string, date:int(long), phone_number:string)"""
 
 
-def get_contact_info(message_data):
+def get_contact_info(message_data : tuple):
     return message_data[2]
 
 
 if __name__ == '__main__':
-    REST_API = threading.Thread(target=app.run, daemon=True)
+    REST_API = threading.Thread(target=app.run, kwargs=({"host": '0.0.0.0', "port": "80"}), daemon=True)
     REST_API.start()
 
     first_contact = threading.Thread(target=send_first_messages, daemon=True)
@@ -166,6 +172,6 @@ if __name__ == '__main__':
             for message_data in new_messages:
                 if valid_message(message_data):
                     processThread = threading.Thread(target=send_message, daemon=True, args=(
-                    get_contact_info(message_data), get_next_message(message_data), True, '\n',))
+                        get_contact_info(message_data), get_next_message(message_data), True, '\n',))
                     processThread.start()
         time.sleep(3)
